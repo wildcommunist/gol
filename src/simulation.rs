@@ -32,7 +32,7 @@ impl Plugin for SimulationPlugin {
             )
             .add_system_set(
                 SystemSet::new()
-                    .with_run_criteria(FixedTimestep::step(0.25))
+                    .with_run_criteria(FixedTimestep::step(0.06))
                     .with_system(
                         simulation_step
                             .label(CellInteraction::Simulation)

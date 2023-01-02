@@ -1,4 +1,6 @@
+use bevy::diagnostic::{Diagnostic, Diagnostics, FrameTimeDiagnosticsPlugin};
 use bevy::prelude::*;
+use crate::input::MainCamera;
 
 const BUTTON_ACTIVE: Color = Color::rgb(0.8, 0.8, 0.8);
 const BUTTON_HOVER: Color = Color::rgb(0.4, 0.8, 0.8);
@@ -9,6 +11,12 @@ pub struct GameExitEvent;
 pub struct StartSimulationEvent;
 
 pub struct StopSimulationEvent;
+
+#[derive(Component)]
+struct FpsText;
+
+#[derive(Component)]
+struct StatsText;
 
 #[derive(Component)]
 pub struct ClassicButton(ButtonType);
@@ -29,7 +37,9 @@ impl Plugin for MainMenuPlugin {
             .add_event::<StartSimulationEvent>()
             .add_event::<StopSimulationEvent>()
             .add_startup_system(setup)
-            .add_system(button_system);
+            .add_system(button_system)
+            .add_system(fps_update_system)
+            .add_system(stats_update_system);
     }
 }
 
@@ -37,6 +47,77 @@ fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
+    commands.spawn((
+        TextBundle::from_sections([
+            TextSection::new(
+                "FPS: ",
+                TextStyle {
+                    font: asset_server.load("fonts/minecraft_font.ttf"),
+                    font_size: 15.0,
+                    color: Color::ANTIQUE_WHITE,
+                },
+            ),
+            TextSection::from_style(TextStyle {
+                font: asset_server.load("fonts/minecraft_font.ttf"),
+                font_size: 15.0,
+                color: Color::GOLD,
+            })
+        ])
+            .with_style(Style {
+                position_type: PositionType::Absolute,
+                position: UiRect {
+                    bottom: Val::Px(5.0),
+                    left: Val::Px(10.0),
+                    ..default()
+                },
+                ..default()
+            })
+        ,
+        FpsText
+    ));
+
+    commands.spawn((
+        TextBundle::from_sections([
+            TextSection::new(
+                "Zoom: ",
+                TextStyle {
+                    font: asset_server.load("fonts/minecraft_font.ttf"),
+                    font_size: 15.0,
+                    color: Color::ANTIQUE_WHITE,
+                },
+            ),
+            TextSection::from_style(TextStyle {
+                font: asset_server.load("fonts/minecraft_font.ttf"),
+                font_size: 15.0,
+                color: Color::GOLD,
+            }),
+            TextSection::new(
+                " Camera: ",
+                TextStyle {
+                    font: asset_server.load("fonts/minecraft_font.ttf"),
+                    font_size: 15.0,
+                    color: Color::ANTIQUE_WHITE,
+                },
+            ),
+            TextSection::from_style(TextStyle {
+                font: asset_server.load("fonts/minecraft_font.ttf"),
+                font_size: 15.0,
+                color: Color::GOLD,
+            })
+        ])
+            .with_style(Style {
+                position_type: PositionType::Absolute,
+                position: UiRect {
+                    bottom: Val::Px(25.0),
+                    left: Val::Px(10.0),
+                    ..default()
+                },
+                ..default()
+            })
+        ,
+        StatsText
+    ));
+
     commands.spawn(
         NodeBundle { // Root
             style: Style {
@@ -53,7 +134,7 @@ fn setup(
                 .spawn(
                     NodeBundle {
                         style: Style {
-                            size: Size::new(Val::Percent(100.0), Val::Percent(15.0)),
+                            size: Size::new(Val::Percent(100.0), Val::Px(75.0)),
                             border: UiRect::all(Val::Px(3.0)),
                             ..Default::default()
                         },
@@ -139,7 +220,7 @@ fn button_system(
     mut stop_writer: EventWriter<StopSimulationEvent>,
     mut exit_writer: EventWriter<GameExitEvent>,
 ) {
-    for (i,mut bc, cb) in query.iter_mut() {
+    for (i, mut bc, cb) in query.iter_mut() {
         match *i {
             Interaction::Clicked => {
                 *bc = BUTTON_DOWN.into();
@@ -162,5 +243,30 @@ fn button_system(
                 *bc = BUTTON_ACTIVE.into();
             }
         }
+    }
+}
+
+fn fps_update_system(
+    diag: Res<Diagnostics>,
+    mut query: Query<&mut Text, With<FpsText>>,
+) {
+    for mut text in &mut query {
+        if let Some(fps) = diag.get(FrameTimeDiagnosticsPlugin::FPS) {
+            if let Some(v) = fps.smoothed() {
+                text.sections[1].value = format!("{v:.2}");
+            }
+        }
+    }
+}
+
+fn stats_update_system(
+    diag: Res<Diagnostics>,
+    mut query: Query<(&mut Text), With<StatsText>>,
+    camera: Query<(&Transform, &OrthographicProjection), With<MainCamera>>,
+) {
+    for mut text in &mut query {
+        let (trans, cam) = camera.single();
+        text.sections[1].value = format!("{:.2}", cam.scale);
+        text.sections[3].value = format!("x:{:.2} y:{:.2}", trans.translation.x, trans.translation.y);
     }
 }

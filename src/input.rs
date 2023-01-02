@@ -30,7 +30,17 @@ fn setup(
     mut commands: Commands
 ) {
     commands
-        .spawn(Camera2dBundle::default())
+        .spawn(Camera2dBundle {
+            projection: OrthographicProjection {
+                scale: 3.5,
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(1570.0, 1680.0, 0.0),
+                ..default()
+            },
+            ..default()
+        })
         .insert(MainCamera)
         .insert(Movement {
             plane_speed: Vec3::new(0.0, 0.0, 0.0),
