@@ -1,10 +1,11 @@
-mod cell;
 mod ui;
 mod input;
+mod simulation;
 
 use bevy::prelude::*;
 use bevy::winit::WinitSettings;
-use crate::cell::GameOfLife;
+use crate::input::InputPlugin;
+use crate::simulation::SimulationPlugin;
 use crate::ui::MainMenuPlugin;
 
 fn main() {
@@ -18,8 +19,10 @@ fn main() {
             },
             ..default()
         }))
-        .insert_resource(WinitSettings::desktop_app())
+        //.insert_resource(WinitSettings::desktop_app())
         .add_plugin(MainMenuPlugin)
+        .add_plugin(InputPlugin)
+        .add_plugin(SimulationPlugin)
         //.add_plugin(GameOfLife)
         .run();
 }
