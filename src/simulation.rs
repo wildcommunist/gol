@@ -1,4 +1,5 @@
 use bevy::{prelude::*, time::FixedTimestep, app::AppExit};
+use bevy::ecs::archetype::Archetype;
 use crate::input::MainCamera;
 use crate::ui::{GameExitEvent, ResetSimulationEvent, StartSimulationEvent, StopSimulationEvent};
 
@@ -6,6 +7,11 @@ const CELL_SIZE: f32 = 32.0;
 const GRID_SIZE: i32 = 100;
 
 pub struct CellMarkedForDeathEvent(Entity);
+
+#[derive(Resource, Default)]
+struct Board {
+    cells: Vec<Cell>,
+}
 
 pub struct SimulationPlugin;
 
@@ -91,6 +97,7 @@ fn setup(
             empty_cell: asset_server.load("sprites/empty_cell.png"),
             alive_cell: asset_server.load("sprites/alive_cell.png"),
             dead_cell: asset_server.load("sprites/dead_cell.png"),
+            dying_cell: asset_server.load("sprites/dying_cell.png"),
         });
 }
 
@@ -248,9 +255,11 @@ struct Cell {
     state: CellState,
 }
 
+#[derive(PartialEq)]
 enum CellState {
     Alive,
     Dead,
+    Dying,
     Empty,
 }
 
@@ -267,6 +276,7 @@ struct SpriteImages {
     empty_cell: Handle<Image>,
     alive_cell: Handle<Image>,
     dead_cell: Handle<Image>,
+    dying_cell: Handle<Image>,
 }
 
 fn simulation_step(
@@ -281,14 +291,8 @@ fn simulation_step(
         let mut life_grid: Vec<bool> = Vec::new();
         for (_, cell, _sprite, mfd) in cells.iter_mut() {
             life_grid.push(match cell.state {
-                CellState::Alive => {
-                    if mfd.is_none() {
-                        true
-                    } else {
-                        false
-                    }
-                }
-                CellState::Dead | CellState::Empty => false,
+                CellState::Alive => true,
+                CellState::Dead | CellState::Empty | CellState::Dying => false,
             });
         }
 
@@ -308,25 +312,54 @@ fn simulation_step(
                 }
             }
 
+            match cell.state {
+                CellState::Dying => {
+                    cell.state = CellState::Dead;
+                    *sprite = sprite_images.dead_cell.clone();
+                }
+                _ => {}
+            }
+
             if neighbour_cnt < 2 || neighbour_cnt > 3 {
                 match cell.state {
                     CellState::Alive => {
-                        if mfd.is_none() {
-                            ew.send(CellMarkedForDeathEvent(entity));
-                            cell.state = CellState::Dead;
-                            *sprite = sprite_images.dead_cell.clone();
-                        }
+                        cell.state = CellState::Dying;
+                        *sprite = sprite_images.dying_cell.clone();
                     }
-                    CellState::Dead | CellState::Empty => {}
+                    CellState::Dead | CellState::Empty | CellState::Dying => {}
                 }
             }
 
-            if neighbour_cnt == 3 {
-                if mfd.is_none() {
+            if cell.state != CellState::Dying {
+                if neighbour_cnt == 3 {
                     cell.state = CellState::Alive;
                     *sprite = sprite_images.alive_cell.clone();
                 }
             }
         }
+    }
+}
+
+fn listen_for_death_events(
+    mut event_reader: EventReader<CellMarkedForDeathEvent>,
+    mut store: ResMut<EntityRegister>,
+    mut commands: Commands,
+) {
+    if let Some(e) = event_reader.iter().next() {
+        for ent in &store.entities {
+            if ent.index() == e.0.index() {
+                commands.entity(*ent).insert(MarkForDeath { generation: 3 });
+            }
+        }
+    }
+}
+
+fn process_dead_cells(
+    mut cells: Query<(&mut Cell), With<MarkForDeath>>,
+    sprite_images: Res<SpriteImages>,
+) {
+    for (idx, (cell)) in cells.iter_mut().enumerate() {
+        println!("is being processed");
+        //*img = sprite_images.dying_cell.clone();
     }
 }
