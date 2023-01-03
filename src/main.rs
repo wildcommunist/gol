@@ -4,6 +4,7 @@ mod simulation;
 
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
+use bevy_editor_pls::prelude::*;
 use crate::input::InputPlugin;
 use crate::simulation::SimulationPlugin;
 use crate::ui::MainMenuPlugin;
@@ -19,6 +20,7 @@ fn main() {
             },
             ..default()
         }))
+        //.add_plugin(EditorPlugin)
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         //.insert_resource(WinitSettings::desktop_app())
         .add_plugin(MainMenuPlugin)

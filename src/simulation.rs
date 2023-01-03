@@ -339,27 +339,3 @@ fn simulation_step(
         }
     }
 }
-
-fn listen_for_death_events(
-    mut event_reader: EventReader<CellMarkedForDeathEvent>,
-    mut store: ResMut<EntityRegister>,
-    mut commands: Commands,
-) {
-    if let Some(e) = event_reader.iter().next() {
-        for ent in &store.entities {
-            if ent.index() == e.0.index() {
-                commands.entity(*ent).insert(MarkForDeath { generation: 3 });
-            }
-        }
-    }
-}
-
-fn process_dead_cells(
-    mut cells: Query<(&mut Cell), With<MarkForDeath>>,
-    sprite_images: Res<SpriteImages>,
-) {
-    for (idx, (cell)) in cells.iter_mut().enumerate() {
-        println!("is being processed");
-        //*img = sprite_images.dying_cell.clone();
-    }
-}
