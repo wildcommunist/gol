@@ -12,6 +12,10 @@ pub struct StartSimulationEvent;
 
 pub struct StopSimulationEvent;
 
+pub struct ResetSimulationEvent;
+
+pub struct MarkCellForDeathEvent;
+
 #[derive(Component)]
 struct FpsText;
 
@@ -26,6 +30,7 @@ enum ButtonType {
     Start,
     Stop,
     Exit,
+    Reset,
 }
 
 pub struct MainMenuPlugin;
@@ -36,6 +41,7 @@ impl Plugin for MainMenuPlugin {
             .add_event::<GameExitEvent>()
             .add_event::<StartSimulationEvent>()
             .add_event::<StopSimulationEvent>()
+            .add_event::<ResetSimulationEvent>()
             .add_startup_system(setup)
             .add_system(button_system)
             .add_system(fps_update_system)
@@ -172,14 +178,14 @@ fn setup(
                             parent
                                 .spawn(build_button(&asset_server))
                                 .with_children(|parent| {
-                                    parent.spawn(build_text("Quit", &asset_server));
+                                    parent.spawn(build_text("Reset", &asset_server));
                                 })
-                                .insert(ClassicButton(ButtonType::Exit));
+                                .insert(ClassicButton(ButtonType::Reset));
 
                             parent
                                 .spawn(build_button(&asset_server))
                                 .with_children(|parent| {
-                                    parent.spawn(build_text("ABOUT", &asset_server));
+                                    parent.spawn(build_text("QUIT", &asset_server));
                                 })
                                 .insert(ClassicButton(ButtonType::Exit));
                         });
@@ -219,6 +225,7 @@ fn button_system(
     mut start_writer: EventWriter<StartSimulationEvent>,
     mut stop_writer: EventWriter<StopSimulationEvent>,
     mut exit_writer: EventWriter<GameExitEvent>,
+    mut reset_writer: EventWriter<ResetSimulationEvent>,
 ) {
     for (i, mut bc, cb) in query.iter_mut() {
         match *i {
@@ -233,6 +240,9 @@ fn button_system(
                     }
                     ButtonType::Exit => {
                         exit_writer.send(GameExitEvent);
+                    }
+                    ButtonType::Reset => {
+                        reset_writer.send(ResetSimulationEvent);
                     }
                 }
             }

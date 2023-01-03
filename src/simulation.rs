@@ -1,22 +1,27 @@
 use bevy::{prelude::*, time::FixedTimestep, app::AppExit};
 use crate::input::MainCamera;
-use crate::ui::{GameExitEvent, StartSimulationEvent, StopSimulationEvent};
+use crate::ui::{GameExitEvent, ResetSimulationEvent, StartSimulationEvent, StopSimulationEvent};
 
 const CELL_SIZE: f32 = 32.0;
 const GRID_SIZE: i32 = 100;
+
+pub struct CellMarkedForDeathEvent(Entity);
 
 pub struct SimulationPlugin;
 
 impl Plugin for SimulationPlugin {
     fn build(&self, app: &mut App) {
         app
+            .add_event::<CellMarkedForDeathEvent>()
             .insert_resource(ClearColor(Color::rgb(0.39, 0.58, 0.93)))
             .insert_resource(MousePositionDraw(None))
             .insert_resource(MousePositionErase(None))
             .insert_resource(IsSimulationRunning(false))
+            .insert_resource(EntityRegister { entities: vec![] })
             .add_system(exit_game)
             .add_system(stop_simulation)
             .add_system(start_simulation)
+            .add_system(reset_simulation)
             .add_system_set(
                 SystemSet::new()
                     .with_run_criteria(FixedTimestep::step(0.016))
@@ -47,6 +52,7 @@ impl Plugin for SimulationPlugin {
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut store: ResMut<EntityRegister>,
 ) {
     for x in 0..GRID_SIZE {
         for y in 0..GRID_SIZE {
@@ -58,7 +64,7 @@ fn setup(
                     ("sprites/empty_cell.png", CellState::Empty)
                 }
             };
-            commands
+            let e = commands
                 .spawn(
                     SpriteBundle {
                         transform: Transform {
@@ -75,7 +81,8 @@ fn setup(
                 )
                 .insert(Cell {
                     state,
-                });
+                }).id();
+            store.entities.push(e);
         }
     }
 
@@ -217,6 +224,19 @@ fn stop_simulation(
     }
 }
 
+fn reset_simulation(
+    mut event_reader: EventReader<ResetSimulationEvent>
+) {
+    if event_reader.iter().next().is_some() {
+        println!("Requesting simulation reset.")
+    }
+}
+
+#[derive(Resource)]
+struct EntityRegister {
+    entities: Vec<Entity>,
+}
+
 #[derive(Resource)]
 struct MousePositionDraw(Option<(f32, f32)>);
 
@@ -254,6 +274,8 @@ fn simulation_step(
     mut cells: Query<(Entity, &mut Cell, &mut Handle<Image>, Option<&MarkForDeath>), With<Cell>>,
     is_running: Res<IsSimulationRunning>,
     sprite_images: Res<SpriteImages>,
+    mut store: ResMut<EntityRegister>,
+    mut ew: EventWriter<CellMarkedForDeathEvent>,
 ) {
     if is_running.0 {
         let mut life_grid: Vec<bool> = Vec::new();
@@ -290,7 +312,7 @@ fn simulation_step(
                 match cell.state {
                     CellState::Alive => {
                         if mfd.is_none() {
-                            //commands.entity(entity).insert(MarkForDeath { generation: 3 });
+                            ew.send(CellMarkedForDeathEvent(entity));
                             cell.state = CellState::Dead;
                             *sprite = sprite_images.dead_cell.clone();
                         }
