@@ -4,7 +4,6 @@ mod simulation;
 
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
-use bevy::winit::WinitSettings;
 use crate::input::InputPlugin;
 use crate::simulation::SimulationPlugin;
 use crate::ui::MainMenuPlugin;

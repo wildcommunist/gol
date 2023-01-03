@@ -40,6 +40,7 @@ impl Plugin for SimulationPlugin {
                     )
             )
             .add_startup_system(setup);
+        //.add_startup_system(setup_samples);
     }
 }
 
@@ -49,6 +50,14 @@ fn setup(
 ) {
     for x in 0..GRID_SIZE {
         for y in 0..GRID_SIZE {
+            let (ass, state) = match check_samples(x, y) {
+                true => {
+                    ("sprites/alive_cell.png", CellState::Alive)
+                }
+                false => {
+                    ("sprites/empty_cell.png", CellState::Empty)
+                }
+            };
             commands
                 .spawn(
                     SpriteBundle {
@@ -60,12 +69,12 @@ fn setup(
                         sprite: Sprite {
                             ..Default::default()
                         },
-                        texture: asset_server.load("sprites/empty_cell.png"),
+                        texture: asset_server.load(ass),
                         ..default()
                     }
                 )
                 .insert(Cell {
-                    state: CellState::Empty,
+                    state,
                 });
         }
     }
@@ -76,6 +85,25 @@ fn setup(
             alive_cell: asset_server.load("sprites/alive_cell.png"),
             dead_cell: asset_server.load("sprites/dead_cell.png"),
         });
+}
+
+pub fn check_samples(
+    x: i32, y: i32,
+) -> bool {
+    let shape = vec![
+        (50, 50),
+        (50, 51),
+        (49, 51),
+        (50, 52),
+        (51, 52),
+    ];
+
+    for (sx, sy) in shape {
+        if sx == x && sy == y {
+            return true;
+        }
+    }
+    false
 }
 
 #[derive(SystemLabel, Debug, Hash, PartialEq, Eq, Clone)]
@@ -206,6 +234,11 @@ enum CellState {
     Empty,
 }
 
+#[derive(Component)]
+struct MarkForDeath {
+    generation: u8,
+}
+
 #[derive(Resource)]
 struct IsSimulationRunning(bool);
 
@@ -217,20 +250,27 @@ struct SpriteImages {
 }
 
 fn simulation_step(
-    mut cells: Query<(&mut Cell, &mut Handle<Image>)>,
+    mut commands: Commands,
+    mut cells: Query<(Entity, &mut Cell, &mut Handle<Image>, Option<&MarkForDeath>), With<Cell>>,
     is_running: Res<IsSimulationRunning>,
     sprite_images: Res<SpriteImages>,
 ) {
     if is_running.0 {
         let mut life_grid: Vec<bool> = Vec::new();
-        for (cell, _sprite) in cells.iter_mut() {
+        for (_, cell, _sprite, mfd) in cells.iter_mut() {
             life_grid.push(match cell.state {
-                CellState::Alive => true,
+                CellState::Alive => {
+                    if mfd.is_none() {
+                        true
+                    } else {
+                        false
+                    }
+                }
                 CellState::Dead | CellState::Empty => false,
             });
         }
 
-        for (ind, (mut cell, mut sprite)) in cells.iter_mut().enumerate() {
+        for (ind, (entity, mut cell, mut sprite, mfd)) in cells.iter_mut().enumerate() {
             let mut neighbour_cnt = 0;
             let x = ind as i32 % GRID_SIZE;
             let y = ind as i32 / GRID_SIZE;
@@ -249,16 +289,21 @@ fn simulation_step(
             if neighbour_cnt < 2 || neighbour_cnt > 3 {
                 match cell.state {
                     CellState::Alive => {
-                        cell.state = CellState::Dead;
-                        *sprite = sprite_images.dead_cell.clone();
+                        if mfd.is_none() {
+                            //commands.entity(entity).insert(MarkForDeath { generation: 3 });
+                            cell.state = CellState::Dead;
+                            *sprite = sprite_images.dead_cell.clone();
+                        }
                     }
                     CellState::Dead | CellState::Empty => {}
                 }
             }
 
             if neighbour_cnt == 3 {
-                cell.state = CellState::Alive;
-                *sprite = sprite_images.alive_cell.clone();
+                if mfd.is_none() {
+                    cell.state = CellState::Alive;
+                    *sprite = sprite_images.alive_cell.clone();
+                }
             }
         }
     }
